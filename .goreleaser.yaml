@@ -1,0 +1,76 @@
+version: 2
+
+project_name: trml-daemon
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: trml-daemon
+    main: .
+    binary: trml-daemon
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/craigderington/trml-daemon/cmd.version={{.Version}}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+# Auto-publishes the formula to craigderington/homebrew-trml on each release.
+# Requires a HOMEBREW_TAP_GITHUB_TOKEN secret with write access to that tap repo.
+brews:
+  - name: trml-daemon
+    repository:
+      owner: craigderington
+      name: homebrew-trml
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://trml.app"
+    description: "Connect Mac/Linux to the trml iOS app via an E2E-encrypted relay"
+    license: MIT
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/trml-daemon --version")
+    install: |
+      bin.install "trml-daemon"
+    caveats: |
+      Pair an iPhone, then install the background service:
+
+        trml-daemon pair
+        trml-daemon install
